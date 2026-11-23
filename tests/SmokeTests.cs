@@ -132,13 +132,15 @@ internal static class SmokeTests
             var settings = (Settings)serializer.ReadObject(legacy);
             Check(!settings.LaunchInBackground && !settings.ExitOnClose,
                 "Existing settings should open the window on launch and close it to the tray");
+            Check(!settings.CloseToTrayNoticeShown, "Existing settings should allow the first close-to-tray notice");
         }
         using (var stream = new MemoryStream())
         {
-            serializer.WriteObject(stream, new Settings { LaunchInBackground = true, ExitOnClose = true });
+            serializer.WriteObject(stream, new Settings { LaunchInBackground = true, ExitOnClose = true, CloseToTrayNoticeShown = true });
             stream.Position = 0;
             var saved = (Settings)serializer.ReadObject(stream);
             Check(saved.LaunchInBackground && saved.ExitOnClose, "Window preferences should survive saving and reloading");
+            Check(saved.CloseToTrayNoticeShown, "The close-to-tray notice should stay dismissed after reloading");
         }
     }
 

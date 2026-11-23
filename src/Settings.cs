@@ -59,6 +59,7 @@ internal sealed class Settings
     [DataMember(EmitDefaultValue = false)] public bool GamingMode;
     [DataMember(EmitDefaultValue = false)] public bool LaunchInBackground;
     [DataMember(EmitDefaultValue = false)] public bool ExitOnClose;
+    [DataMember(EmitDefaultValue = false)] public bool CloseToTrayNoticeShown;
     [DataMember] public List<Snippet> Snippets = new List<Snippet>();
     internal Dictionary<string, string> Expansions;
 

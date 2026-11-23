@@ -12,9 +12,9 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
 [assembly: AssemblyDescription("Windows keyboard layout conversion and snippet expansion")]
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
-[assembly: AssemblyInformationalVersion("0.1.0")]
+[assembly: AssemblyVersion("0.1.1.0")]
+[assembly: AssemblyFileVersion("0.1.1.0")]
+[assembly: AssemblyInformationalVersion("0.1.1")]
 
 internal static class Program
 {
@@ -96,6 +96,7 @@ internal sealed class TrayApp : ApplicationContext
         form = new ModernSettingsForm(settings, engine, windowIcon, updated =>
         {
             updated.GamingMode = settings.GamingMode;
+            updated.CloseToTrayNoticeShown = settings.CloseToTrayNoticeShown;
             updated.Save();
             settings = updated;
             engine.Apply(updated);
@@ -105,8 +106,18 @@ internal sealed class TrayApp : ApplicationContext
             engine.Recorded = null;
             form = null;
             if (settings.ExitOnClose) BeginExit();
-            else if (args.CloseReason == CloseReason.UserClosing)
+            else if (!exiting && args.CloseReason == CloseReason.UserClosing && !settings.CloseToTrayNoticeShown)
+            {
+                settings.CloseToTrayNoticeShown = true;
                 ShowNotice("Still running in the background. Choose Exit from the tray menu to quit.");
+                try { settings.Save(); }
+                catch (Exception error)
+                {
+                    if (!(error is InvalidDataException || error is IOException ||
+                        error is UnauthorizedAccessException || error is SerializationException)) throw;
+                    Debug.WriteLine(error.Message);
+                }
+            }
         };
         form.Show();
     }

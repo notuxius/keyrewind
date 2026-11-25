@@ -46,6 +46,7 @@ internal static class SmokeTests
         catch (InvalidDataException) { }
         Check(Marshal.SizeOf(typeof(WindowsInput.Input)) == (IntPtr.Size == 8 ? 40 : 28), "SendInput ABI must match Windows");
 
+        CheckDefaultSnippets();
         CheckLayoutPair();
         CheckAppearance();
         CheckAutoswitchPopups();
@@ -76,6 +77,30 @@ internal static class SmokeTests
         }
         else Console.WriteLine("English–Ukrainian mapping test skipped because those layouts are absent.");
         Console.WriteLine("Smoke tests passed.");
+    }
+
+    private static void CheckDefaultSnippets()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "KeyRewind-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var fresh = Settings.Load(path);
+            Check(fresh.Snippets.Count == 10 && fresh.Expand == null && fresh.Expansions["krthanks"] == "Thanks for your help!",
+                "Fresh settings should have ten example snippets and use Double Space");
+
+            var serializer = new DataContractJsonSerializer(typeof(Settings));
+            var saved = new Settings();
+            saved.Snippets.Add(new Snippet { Trigger = "krthanks", Text = "Custom thanks" });
+            using (var stream = File.Create(path)) serializer.WriteObject(stream, saved);
+            var existing = Settings.Load(path);
+            Check(existing.Snippets.Count == 1 && existing.Expansions["krthanks"] == "Custom thanks",
+                "Existing settings should use the saved snippets");
+
+            saved.Snippets.Clear();
+            using (var stream = File.Create(path)) serializer.WriteObject(stream, saved);
+            Check(Settings.Load(path).Snippets.Count == 0, "A saved empty list should stay empty");
+        }
+        finally { File.Delete(path); }
     }
 
     private static void CheckLayoutPair()

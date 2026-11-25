@@ -74,15 +74,33 @@ internal sealed class Settings
     [OnDeserializing]
     private void SetDefaults(StreamingContext context) { ShowAutoswitchPopups = true; }
 
-    internal static Settings Load()
+    internal static Settings Load(string path = null)
     {
         Settings settings;
-        string path = ReadPath;
+        path = path ?? ReadPath;
         if (File.Exists(path))
         {
             using (var stream = File.OpenRead(path)) settings = (Settings)Serializer.ReadObject(stream);
         }
-        else settings = new Settings();
+        else
+        {
+            settings = new Settings
+            {
+                Snippets = new List<Snippet>
+                {
+                    new Snippet { Trigger = "krhello", Text = "Hi! How can I help?" },
+                    new Snippet { Trigger = "krthanks", Text = "Thanks for your help!" },
+                    new Snippet { Trigger = "krwelcome", Text = "You’re welcome!" },
+                    new Snippet { Trigger = "krbrb", Text = "I’ll be back in a few minutes." },
+                    new Snippet { Trigger = "krgotit", Text = "Got it, thanks!" },
+                    new Snippet { Trigger = "kragreed", Text = "That works for me." },
+                    new Snippet { Trigger = "krcheck", Text = "I’ll check and get back to you." },
+                    new Snippet { Trigger = "krfollowup", Text = "Just following up on my previous message." },
+                    new Snippet { Trigger = "krdetails", Text = "Could you send me a few more details?" },
+                    new Snippet { Trigger = "krregards", Text = "Best regards," }
+                }
+            };
+        }
         if (settings == null) throw new InvalidDataException("The settings file is empty.");
         if (!Enum.IsDefined(typeof(AppearanceMode), settings.Appearance)) settings.Appearance = AppearanceMode.System;
         settings.Validate();

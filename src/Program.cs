@@ -21,7 +21,7 @@ using System.Xml;
 internal static class Program
 {
     internal const string Name = "KeyRewind";
-    internal const string ReleaseVersion = "0.4.0";
+    internal const string ReleaseVersion = "0.4.1";
 
     [STAThread]
     private static void Main(string[] args)

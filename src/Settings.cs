@@ -61,6 +61,7 @@ internal sealed class Settings
     [DataMember(EmitDefaultValue = false)] public bool LaunchInBackground;
     [DataMember(EmitDefaultValue = false)] public bool ExitOnClose;
     [DataMember(EmitDefaultValue = false)] public bool CloseToTrayNoticeShown;
+    [DataMember(EmitDefaultValue = false)] public string UpdateNotifiedVersion;
     [DataMember(EmitDefaultValue = false)] public Rectangle SettingsWindowBounds;
     [DataMember(EmitDefaultValue = false)] public bool SettingsWindowMaximized;
     [DataMember] public List<Snippet> Snippets = new List<Snippet>();

@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using System;
 using System.Drawing;
 using System.IO;
@@ -46,11 +47,13 @@ internal static class SmokeTests
         catch (InvalidDataException) { }
         Check(Marshal.SizeOf(typeof(WindowsInput.Input)) == (IntPtr.Size == 8 ? 40 : 28), "SendInput ABI must match Windows");
 
+        UpdateSmokeTests.Run();
         CheckDefaultSnippets();
         CheckLayoutPair();
         CheckAppearance();
         CheckAutoswitchPopups();
         CheckWindowPreferences();
+        CheckWindowsStartup();
         CheckWindowPlacement();
         CheckSavedGamingMode();
         CheckGamingTrayIcon();
@@ -168,6 +171,36 @@ internal static class SmokeTests
             Check(saved.LaunchInBackground && saved.ExitOnClose, "Window preferences should survive saving and reloading");
             Check(saved.CloseToTrayNoticeShown, "The close-to-tray notice should stay dismissed after reloading");
         }
+    }
+
+    private static void CheckWindowsStartup()
+    {
+        string keyPath = @"Software\KeyRewind-SmokeTest-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            Check(WindowsStartup.ReadCommand(keyPath) == null && WindowsStartup.Save(false, null, keyPath) == null,
+                "Windows startup should be off without an opt-in");
+            using (var key = Registry.CurrentUser.OpenSubKey(keyPath))
+                Check(key == null, "Saving with startup off must leave a missing key alone");
+
+            string command = WindowsStartup.Save(true, null, keyPath);
+            Check(command == "\"" + Application.ExecutablePath + "\"" && WindowsStartup.ReadCommand(keyPath) == command,
+                "Opting in should register the quoted executable path");
+
+            const string oldCommand = "\"C:\\Old Location\\KeyRewind.exe\"";
+            using (var key = Registry.CurrentUser.OpenSubKey(keyPath, true))
+            {
+                key.SetValue(Program.Name, oldCommand);
+                key.SetValue("OtherApp", "Keep this entry");
+            }
+            Check(WindowsStartup.Save(true, WindowsStartup.ReadCommand(keyPath), keyPath) == command &&
+                WindowsStartup.ReadCommand(keyPath) == command, "Saving after moving the executable should update the command");
+            Check(WindowsStartup.Save(false, command, keyPath) == null && WindowsStartup.ReadCommand(keyPath) == null,
+                "Opting out should remove the startup entry");
+            using (var key = Registry.CurrentUser.OpenSubKey(keyPath))
+                Check(Equals(key.GetValue("OtherApp"), "Keep this entry"), "Opting out must leave other apps' entries alone");
+        }
+        finally { Registry.CurrentUser.DeleteSubKey(keyPath, false); }
     }
 
     private static void CheckAutoswitchPopups()

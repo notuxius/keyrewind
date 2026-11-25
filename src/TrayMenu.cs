@@ -119,7 +119,8 @@ internal sealed class TrayMenu : ContextMenuStrip
             int width = Scale(216);
             if (!highContrast)
                 foreach (ToolStripItem item in Items)
-                    width = Math.Max(width, TextRenderer.MeasureText(item.Text, Font).Width + Scale(TextInset + 38));
+                    if (item.Available)
+                        width = Math.Max(width, TextRenderer.MeasureText(item.Text, Font).Width + Scale(TextInset + 38));
             MinimumSize = highContrast ? Size.Empty : new Size(width, 0);
             int height = Math.Max(Scale(36), Font.Height + Scale(16));
             foreach (ToolStripItem item in Items)

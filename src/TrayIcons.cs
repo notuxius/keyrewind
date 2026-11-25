@@ -6,7 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 
-internal enum TrayMenuIcon { Settings, Gamepad, Exit }
+internal enum TrayMenuIcon { Settings, Gamepad, Update, Exit }
 
 internal static class TrayIcons
 {
@@ -58,6 +58,11 @@ internal static class TrayIcons
                     break;
                 case TrayMenuIcon.Gamepad:
                     DrawGamepad(graphics, pen);
+                    break;
+                case TrayMenuIcon.Update:
+                    graphics.DrawLine(pen, 8, 2, 8, 10);
+                    graphics.DrawLines(pen, new[] { new Point(5, 7), new Point(8, 10), new Point(11, 7) });
+                    graphics.DrawLines(pen, new[] { new Point(3, 10), new Point(3, 14), new Point(13, 14), new Point(13, 10) });
                     break;
                 case TrayMenuIcon.Exit:
                     graphics.DrawLines(pen, new[] { new Point(7, 2), new Point(3, 2), new Point(3, 14), new Point(7, 14) });

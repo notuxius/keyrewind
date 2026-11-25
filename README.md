@@ -17,7 +17,15 @@ In **Settings → Appearance**, choose **System**, **Light**, or **Dark**, then 
 
 KeyRewind remembers the Settings window’s position, size, and maximized state when you close it. If a monitor is disconnected, Settings reopens within the available screen space.
 
-In **Settings → General**, enable **Launch in background** to start KeyRewind with only the tray icon visible. **Close to tray** is enabled by default. The first time you close Settings to the tray, a notification tells you KeyRewind is still running in the background. Turn off **Close to tray** to exit when the window closes. Select **Save changes** to apply your choices.
+In **Settings → General**, check **Start with Windows** to run KeyRewind when you sign in. Enable **Launch in background** to start with only the tray icon visible. Select **Save changes** to apply your choices. If you move `KeyRewind.exe`, open it from its new location and save again to update the startup path.
+
+**Close to tray** is enabled by default. The first time you close Settings to the tray, a notification tells you KeyRewind is still running in the background. Turn off **Close to tray** and select **Save changes** to exit when the window closes.
+
+## Update KeyRewind
+
+When a newer stable release is available, right-click the tray icon and choose **Close and update**. KeyRewind downloads and verifies the update first, then closes and reopens from the same location. If Settings has unsaved changes, choose **Save**, **Discard**, or **Cancel**.
+
+If the folder is read-only, download the portable executable from [GitHub Releases](https://github.com/notuxius/keyrewind/releases), choose **Exit** in KeyRewind, and replace the old executable in a folder you can write to. Install v0.4.0 manually once if you're using an older version.
 
 ## Terminals and other applications
 

@@ -12,6 +12,7 @@ internal sealed class ModernSettingsForm : Form
     private const string InvalidShortcutMessage = "Use a modifier key with your shortcut, or choose a function key.";
     private readonly Action<Settings> apply;
     private readonly Settings original;
+    private Settings lastSaved;
     private readonly KeyboardEngine engine;
     private readonly Font bodyFont = new Font("Segoe UI", 10);
     private readonly Font titleFont = new Font("Segoe UI", 25, FontStyle.Bold);
@@ -26,6 +27,7 @@ internal sealed class ModernSettingsForm : Form
     private readonly Hotkey defaultConvert = Settings.CreateDefaultConvert();
     private readonly ToolTip shortcutTips = new ToolTip();
     private readonly SettingsButton convertButton, expandButton, resetConvert, resetExpand;
+    private readonly SettingsCheckBox startWithWindows = new SettingsCheckBox("Start with Windows");
     private readonly SettingsCheckBox launchInBackground = new SettingsCheckBox("Launch in background");
     private readonly SettingsCheckBox closeToTray = new SettingsCheckBox("Close to tray");
     private readonly Label status = TextLabel("", true);
@@ -35,6 +37,7 @@ internal sealed class ModernSettingsForm : Form
     private Hotkey convert, expand;
     private SettingsButton recording;
     private FormWindowState unminimizedState;
+    private string startupCommand;
 
     [DllImport("user32.dll")]
     private static extern bool RedrawWindow(IntPtr window, IntPtr updateRectangle, IntPtr updateRegion, uint flags);
@@ -126,6 +129,7 @@ internal sealed class ModernSettingsForm : Form
         ShowPage(0);
         TrackScrollbars(this);
         ApplyTheme();
+        lastSaved = ReadChanges();
         SystemEvents.UserPreferenceChanged += UserPreferenceChanged;
     }
 
@@ -489,15 +493,25 @@ internal sealed class ModernSettingsForm : Form
 
     private void BuildGeneral(TableLayoutPanel page, Settings settings)
     {
+        try { startupCommand = WindowsStartup.ReadCommand(); }
+        catch (Exception error)
+        {
+            if (!WindowsStartup.IsAccessError(error)) throw;
+            startWithWindows.Enabled = false;
+        }
+        startWithWindows.Checked = startupCommand != null;
         launchInBackground.Checked = settings.LaunchInBackground;
         closeToTray.Checked = !settings.ExitOnClose;
         TableLayoutPanel rows;
         var card = Card(out rows);
+        AddRow(rows, startWithWindows, 32, 0);
+        AddRow(rows, TextLabel(startWithWindows.Enabled ? "Open KeyRewind when you sign in." :
+            "Windows startup settings are unavailable.", true, SettingsCheckBox.LabelInset), 26, 10);
         AddRow(rows, launchInBackground, 32, 0);
         AddRow(rows, TextLabel("Start with only the tray icon visible.", true, SettingsCheckBox.LabelInset), 26, 10);
         AddRow(rows, closeToTray, 32, 0);
         AddRow(rows, TextLabel("Keep KeyRewind running when you close this window.", true, SettingsCheckBox.LabelInset), 26, 0);
-        AddRow(page, card, 160, 12);
+        AddRow(page, card, 228, 12);
         AddRow(page, TextLabel("Version " + Application.ProductVersion, true), 28, 0);
     }
 
@@ -552,11 +566,58 @@ internal sealed class ModernSettingsForm : Form
         }
     }
 
-    private void SaveChanges()
+    internal bool ConfirmUpdate()
     {
         StopRecording();
-        if (!snippets.EndEdit()) return;
-        var settings = new Settings
+        if (!snippets.EndEdit()) return false;
+        var current = ReadChanges();
+        if (SameHotkey(current.Convert, lastSaved.Convert) && SameHotkey(current.Expand, lastSaved.Expand) &&
+            current.Appearance == lastSaved.Appearance && current.ShowAutoswitchPopups == lastSaved.ShowAutoswitchPopups &&
+            current.LaunchInBackground == lastSaved.LaunchInBackground && current.ExitOnClose == lastSaved.ExitOnClose &&
+            current.LayoutA == lastSaved.LayoutA && current.LayoutB == lastSaved.LayoutB &&
+            startWithWindows.Checked == (startupCommand != null) &&
+            current.Snippets.Select(snippet => new { snippet.Trigger, snippet.Text })
+                .SequenceEqual(lastSaved.Snippets.Select(snippet => new { snippet.Trigger, snippet.Text })))
+            return true;
+
+        BringForward();
+        using (var prompt = new Form
+        {
+            Text = "Save changes before updating?", Icon = Icon, Font = Font, AutoScaleMode = AutoScaleMode.Font,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog, ShowInTaskbar = false, MaximizeBox = false,
+            MinimizeBox = false, BackColor = theme.Background, Padding = new Padding(16)
+        })
+        {
+            var contents = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            contents.Controls.Add(new Label
+            {
+                Text = "Settings has unsaved changes.", AutoSize = true, Margin = new Padding(3, 4, 3, 14)
+            });
+            var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+            var save = new Button { Text = "Save", AutoSize = true, DialogResult = DialogResult.Yes };
+            var discard = new Button { Text = "Discard", AutoSize = true, DialogResult = DialogResult.No };
+            var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+            buttons.Controls.AddRange(new Control[] { save, discard, cancel });
+            contents.Controls.Add(buttons);
+            prompt.Controls.Add(contents);
+            prompt.AcceptButton = save;
+            prompt.CancelButton = cancel;
+            theme.Apply(prompt);
+            prompt.HandleCreated += (sender, args) => theme.ApplyCaption(prompt.Handle);
+            var choice = prompt.ShowDialog(this);
+            return choice == DialogResult.No || choice == DialogResult.Yes && SaveChanges();
+        }
+    }
+
+    private static bool SameHotkey(Hotkey first, Hotkey second)
+    {
+        return first == null ? second == null : second != null && first.Matches(second.Key, second.Modifiers);
+    }
+
+    private Settings ReadChanges()
+    {
+        return new Settings
         {
             Convert = convert, Expand = expand, Appearance = appearance,
             ShowAutoswitchPopups = autoswitchPopups.Checked,
@@ -568,24 +629,45 @@ internal sealed class ModernSettingsForm : Form
                 Trigger = (string)row.Cells[0].Value, Text = (string)row.Cells[1].Value
             }).ToList()
         };
+    }
+
+    private bool SaveChanges()
+    {
+        StopRecording();
+        if (!snippets.EndEdit()) return false;
+        var settings = ReadChanges();
         if (installed.Length > 2 && (settings.LayoutA != 0 || settings.LayoutB != 0) &&
             (settings.LayoutA == 0 || settings.LayoutB == 0 || settings.LayoutA == settings.LayoutB))
         {
             ShowPage(0);
             status.Text = "Choose two different layouts or clear both selections.";
-            return;
+            return false;
         }
         try
         {
             RememberPlacement(settings);
             apply(settings);
-            status.Text = "Changes saved.";
+            lastSaved = settings;
         }
         catch (Exception error)
         {
-            if (!(error is InvalidDataException || error is IOException ||
-                error is UnauthorizedAccessException || error is SerializationException)) throw;
+            if (!(error is InvalidDataException || error is IOException || error is
+                UnauthorizedAccessException || error is SerializationException)) throw;
             status.Text = error.Message;
+            return false;
+        }
+        try
+        {
+            if (startWithWindows.Enabled)
+                startupCommand = WindowsStartup.Save(startWithWindows.Checked, startupCommand);
+            status.Text = "Changes saved.";
+            return true;
+        }
+        catch (Exception error)
+        {
+            if (!WindowsStartup.IsAccessError(error)) throw;
+            status.Text = "Could not change Windows startup. " + error.Message;
+            return false;
         }
     }
 

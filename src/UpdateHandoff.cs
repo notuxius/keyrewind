@@ -194,13 +194,18 @@ internal static class UpdateHandoff
 
         private void CleanAfterHelper()
         {
+            if (WaitForHelperExit()) files.CleanStaging();
+        }
+
+        internal bool WaitForHelperExit()
+        {
             try
             {
                 using (var helper = Process.GetProcessById(helperId))
                 {
                     if (string.Equals(helper.MainModule.FileName, files.Helper, StringComparison.OrdinalIgnoreCase) &&
                         !helper.WaitForExit(ExitTimeout))
-                        return;
+                        return false;
                 }
             }
             catch (Exception error)
@@ -208,7 +213,7 @@ internal static class UpdateHandoff
                 if (!IsFailure(error)) throw;
                 Debug.WriteLine(error.Message);
             }
-            files.CleanStaging();
+            return true;
         }
 
         public void Dispose()

@@ -21,11 +21,28 @@ using System.Xml;
 internal static class Program
 {
     internal const string Name = "KeyRewind";
-    internal const string ReleaseVersion = "0.4.1";
+    internal const string ReleaseVersion = "0.4.2";
 
     [STAThread]
     private static void Main(string[] args)
     {
+        try
+        {
+            if (StandardUserLaunch.RestartIfElevated())
+            {
+                // An older updater can still be waiting on the process it launched.
+                using (var handoff = UpdateHandoff.ReadRestart(args))
+                    if (handoff != null && handoff.Installing) handoff.WaitForHelperExit();
+                return;
+            }
+        }
+        catch (Win32Exception error)
+        {
+            MessageBox.Show("KeyRewind could not start with standard-user permissions.\r\n\r\n" + error.Message,
+                Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
         if (UpdateHandoff.TryRunInstaller(args)) return;
         using (var restart = UpdateHandoff.ReadRestart(args))
         {

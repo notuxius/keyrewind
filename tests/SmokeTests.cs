@@ -1,18 +1,28 @@
 using Microsoft.Win32;
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 internal static class SmokeTests
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--check-standard-user-launch")
+        {
+            if (!StandardUserLaunch.RestartIfElevated())
+                using (var ready = EventWaitHandle.OpenExisting(args[1]))
+                    ready.Set();
+            return;
+        }
+
         var settings = new Settings();
         const string replacement = "test@example.test";
         settings.Snippets.Add(new Snippet { Trigger = "n@.", Text = replacement });
@@ -54,6 +64,7 @@ internal static class SmokeTests
         CheckAutoswitchPopups();
         CheckWindowPreferences();
         CheckWindowsStartup();
+        CheckStandardUserLaunch();
         CheckWindowPlacement();
         CheckSavedGamingMode();
         CheckGamingTrayIcon();
@@ -201,6 +212,18 @@ internal static class SmokeTests
                 Check(Equals(key.GetValue("OtherApp"), "Keep this entry"), "Opting out must leave other apps' entries alone");
         }
         finally { Registry.CurrentUser.DeleteSubKey(keyPath, false); }
+    }
+
+    private static void CheckStandardUserLaunch()
+    {
+        string name = @"Local\KeyRewind smoke test " + Guid.NewGuid().ToString("N");
+        using (var ready = new EventWaitHandle(false, EventResetMode.ManualReset, name))
+        using (var child = Process.Start(new ProcessStartInfo(Application.ExecutablePath,
+            "--check-standard-user-launch \"" + name + "\"") { UseShellExecute = false, CreateNoWindow = true }))
+        {
+            Check(child.WaitForExit(5000) && child.ExitCode == 0 && ready.WaitOne(5000),
+                "KeyRewind should start with standard-user rights and preserve its arguments");
+        }
     }
 
     private static void CheckAutoswitchPopups()

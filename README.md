@@ -19,6 +19,8 @@ KeyRewind remembers the Settings window’s position, size, and maximized state 
 
 In **Settings → General**, check **Start with Windows** to run KeyRewind when you sign in. Enable **Launch in background** to start with only the tray icon visible. Select **Save changes** to apply your choices. If you move `KeyRewind.exe`, open it from its new location and save again to update the startup path.
 
+Opening KeyRewind from the Start menu, at sign-in, or from an elevated shell starts the tray utility with standard-user permissions. If Windows passes it administrator rights, KeyRewind relaunches itself with those rights removed before it starts its input hooks.
+
 **Close to tray** is enabled by default. The first time you close Settings to the tray, a notification tells you KeyRewind is still running in the background. Turn off **Close to tray** and select **Save changes** to exit when the window closes.
 
 ## Update KeyRewind

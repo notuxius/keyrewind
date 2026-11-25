@@ -1,6 +1,8 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
+using System.Windows.Automation;
 using System.Windows.Forms;
 
 internal sealed class TrayMenu : ContextMenuStrip
@@ -10,10 +12,15 @@ internal sealed class TrayMenu : ContextMenuStrip
 
     private readonly ToolStripSystemRenderer systemRenderer = new ToolStripSystemRenderer();
     private readonly TrayMenuRenderer trayRenderer;
+    private readonly Func<AppearanceMode> appearance;
+    private readonly Func<string> tooltip;
     private SettingsTheme theme;
+    private bool positioning;
 
-    internal TrayMenu()
+    internal TrayMenu(Func<AppearanceMode> appearance, Func<string> tooltip)
     {
+        this.appearance = appearance;
+        this.tooltip = tooltip;
         AccessibleName = Program.Name;
         ShowImageMargin = false;
         trayRenderer = new TrayMenuRenderer(this);
@@ -26,7 +33,77 @@ internal sealed class TrayMenu : ContextMenuStrip
         return item;
     }
 
-    internal void ApplyAppearance(AppearanceMode appearance)
+    protected override void SetVisibleCore(bool visible)
+    {
+        if (!visible || Visible || positioning)
+        {
+            base.SetVisibleCore(visible);
+            return;
+        }
+
+        ApplyAppearance(appearance());
+        Point cursor = Cursor.Position;
+        Rectangle workArea = Screen.FromPoint(cursor).WorkingArea;
+        Rectangle bounds = GetTrayIconBounds(cursor, tooltip());
+        Size size = GetPreferredSize(Size.Empty);
+        int x = bounds.IsEmpty ? cursor.X : bounds.Left + bounds.Width / 2;
+        int above = (bounds.IsEmpty ? Math.Min(cursor.Y, workArea.Bottom) : bounds.Top) - size.Height;
+        int below = bounds.IsEmpty ? cursor.Y : bounds.Bottom;
+        // Show at the measured position while NotifyIcon is handling menu activation.
+        positioning = true;
+        try { Show(new Point(x - size.Width / 2, above >= workArea.Top ? above : below)); }
+        finally { positioning = false; }
+    }
+
+    private Rectangle GetTrayIconBounds(Point cursor, string tooltip)
+    {
+        Point physicalCursor;
+        if (!GetPhysicalCursorPos(out physicalCursor)) return Rectangle.Empty;
+        IntPtr trayWindow = WindowFromPhysicalPoint(physicalCursor);
+        uint shellProcess, hitProcess;
+        WindowsInput.GetWindowThreadProcessId(GetShellWindow(), out shellProcess);
+        WindowsInput.GetWindowThreadProcessId(trayWindow, out hitProcess);
+        if (hitProcess == 0 || hitProcess != shellProcess) return Rectangle.Empty;
+
+        try
+        {
+            var hit = AutomationElement.FromPoint(new System.Windows.Point(physicalCursor.X, physicalCursor.Y));
+            if (hit == null) return Rectangle.Empty;
+            // Explorer can return the overflow flyout itself for a hit inside an icon.
+            var icon = hit.FindFirst(TreeScope.Subtree,
+                new PropertyCondition(AutomationElement.NameProperty, tooltip));
+            if (icon == null || icon.Current.IsOffscreen) return Rectangle.Empty;
+            var bounds = icon.Current.BoundingRectangle;
+            uint trayDpi = GetDpiForWindow(trayWindow);
+            if (bounds.IsEmpty || trayDpi == 0) return Rectangle.Empty;
+
+            Location = cursor;
+            // UI Automation reports physical pixels. WinForms positions the menu in its own DPI units.
+            double scale = GetDpiForWindow(Handle) / (double)trayDpi;
+            return Rectangle.FromLTRB(
+                cursor.X + (int)Math.Floor((bounds.Left - physicalCursor.X) * scale),
+                cursor.Y + (int)Math.Floor((bounds.Top - physicalCursor.Y) * scale),
+                cursor.X + (int)Math.Ceiling((bounds.Right - physicalCursor.X) * scale),
+                cursor.Y + (int)Math.Ceiling((bounds.Bottom - physicalCursor.Y) * scale));
+        }
+        catch (ElementNotAvailableException) { }
+        catch (COMException) { }
+        return Rectangle.Empty;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetPhysicalCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPhysicalPoint(Point point);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr window);
+
+    private void ApplyAppearance(AppearanceMode appearance)
     {
         theme = SettingsTheme.Create(appearance);
         SuspendLayout();

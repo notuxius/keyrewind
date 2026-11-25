@@ -12,9 +12,9 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
 [assembly: AssemblyDescription("Windows keyboard layout conversion and snippet expansion")]
-[assembly: AssemblyVersion("0.1.1.0")]
-[assembly: AssemblyFileVersion("0.1.1.0")]
-[assembly: AssemblyInformationalVersion("0.1.1")]
+[assembly: AssemblyVersion("0.1.2.0")]
+[assembly: AssemblyFileVersion("0.1.2.0")]
+[assembly: AssemblyInformationalVersion("0.1.2")]
 
 internal static class Program
 {
@@ -66,16 +66,18 @@ internal sealed class TrayApp : ApplicationContext
         this.gamingTrayIcon = gamingTrayIcon;
         settings = Settings.Load();
         engine = new KeyboardEngine(dispatcher, settings, ShowNotice);
-        menu = new TrayMenu();
+        menu = new TrayMenu(() => settings.Appearance, () => icon.Text);
         menu.AddAction("Settings", TrayMenuIcon.Settings, (sender, args) => OpenSettings());
         gamingMode = menu.AddAction("Gaming Mode", TrayMenuIcon.Gamepad, (sender, args) => ToggleGamingMode());
         menu.Items.Add(new ToolStripSeparator());
         menu.AddAction("Exit", TrayMenuIcon.Exit, (sender, args) => BeginExit());
-        menu.Opening += (sender, args) => menu.ApplyAppearance(settings.Appearance);
         icon = new NotifyIcon { ContextMenuStrip = menu };
         SetGamingIndicator(settings.GamingMode, settings.GamingMode ? GamingModeTooltip : Program.Name);
         icon.Visible = true;
-        icon.DoubleClick += (sender, args) => OpenSettings();
+        icon.MouseClick += (sender, args) =>
+        {
+            if (args.Button == MouseButtons.Left) OpenSettings();
+        };
         if (!settings.LaunchInBackground) dispatcher.BeginInvoke((Action)OpenSettings);
     }
 

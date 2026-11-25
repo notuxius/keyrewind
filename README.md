@@ -15,6 +15,8 @@ When conversion switches your keyboard layout, KeyRewind shows the new layout in
 
 In **Settings → Appearance**, choose **System**, **Light**, or **Dark**, then select **Save changes**. System follows the Windows app color setting.
 
+KeyRewind remembers the Settings window’s position, size, and maximized state when you close it. If a monitor is disconnected, Settings reopens within the available screen space.
+
 In **Settings → General**, enable **Launch in background** to start KeyRewind with only the tray icon visible. **Close to tray** is enabled by default. The first time you close Settings to the tray, a notification tells you KeyRewind is still running in the background. Turn off **Close to tray** to exit when the window closes. Select **Save changes** to apply your choices.
 
 ## Terminals and other applications

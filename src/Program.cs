@@ -12,9 +12,9 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
 [assembly: AssemblyDescription("Windows keyboard layout conversion and snippet expansion")]
-[assembly: AssemblyVersion("0.2.0.0")]
-[assembly: AssemblyFileVersion("0.2.0.0")]
-[assembly: AssemblyInformationalVersion("0.2.0")]
+[assembly: AssemblyVersion("0.2.1.0")]
+[assembly: AssemblyFileVersion("0.2.1.0")]
+[assembly: AssemblyInformationalVersion("0.2.1")]
 
 internal static class Program
 {
@@ -97,8 +97,7 @@ internal sealed class TrayApp : ApplicationContext
         if (exiting) return;
         if (form != null)
         {
-            if (form.WindowState == FormWindowState.Minimized) form.WindowState = FormWindowState.Normal;
-            form.Activate();
+            form.BringForward();
             return;
         }
         form = new ModernSettingsForm(settings, engine, windowIcon, updated =>
@@ -112,12 +111,17 @@ internal sealed class TrayApp : ApplicationContext
         form.FormClosed += (sender, args) =>
         {
             engine.Recorded = null;
+            bool placementChanged = form.RememberPlacement(settings);
             form = null;
-            if (settings.ExitOnClose) BeginExit();
-            else if (!exiting && args.CloseReason == CloseReason.UserClosing && !settings.CloseToTrayNoticeShown)
+            bool showNotice = !settings.ExitOnClose && !exiting && args.CloseReason == CloseReason.UserClosing &&
+                !settings.CloseToTrayNoticeShown;
+            if (showNotice)
             {
                 settings.CloseToTrayNoticeShown = true;
                 ShowNotice("Still running in the background. Choose Exit from the tray menu to quit.");
+            }
+            if (placementChanged || showNotice)
+            {
                 try { settings.Save(); }
                 catch (Exception error)
                 {
@@ -126,6 +130,7 @@ internal sealed class TrayApp : ApplicationContext
                     Debug.WriteLine(error.Message);
                 }
             }
+            if (settings.ExitOnClose) BeginExit();
         };
         form.Show();
     }

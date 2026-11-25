@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -60,6 +61,8 @@ internal sealed class Settings
     [DataMember(EmitDefaultValue = false)] public bool LaunchInBackground;
     [DataMember(EmitDefaultValue = false)] public bool ExitOnClose;
     [DataMember(EmitDefaultValue = false)] public bool CloseToTrayNoticeShown;
+    [DataMember(EmitDefaultValue = false)] public Rectangle SettingsWindowBounds;
+    [DataMember(EmitDefaultValue = false)] public bool SettingsWindowMaximized;
     [DataMember] public List<Snippet> Snippets = new List<Snippet>();
     internal Dictionary<string, string> Expansions;
 

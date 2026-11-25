@@ -50,6 +50,7 @@ internal static class SmokeTests
         CheckAppearance();
         CheckAutoswitchPopups();
         CheckWindowPreferences();
+        CheckWindowPlacement();
         CheckSavedGamingMode();
         CheckGamingTrayIcon();
         CheckInputLifecycle();
@@ -157,6 +158,40 @@ internal static class SmokeTests
             stream.Position = 0;
             Check(!((Settings)serializer.ReadObject(stream)).ShowAutoswitchPopups, "Turning off autoswitch popups should survive saving");
         }
+    }
+
+    private static void CheckWindowPlacement()
+    {
+        var serializer = new DataContractJsonSerializer(typeof(Settings));
+        using (var legacy = new MemoryStream(Encoding.UTF8.GetBytes("{\"Snippets\":[]}")))
+        {
+            var saved = (Settings)serializer.ReadObject(legacy);
+            Check(saved.SettingsWindowBounds.IsEmpty && !saved.SettingsWindowMaximized,
+                "Existing settings should open a centered, normal window");
+        }
+
+        var bounds = new Rectangle(-1400, 120, 900, 580);
+        using (var stream = new MemoryStream())
+        {
+            serializer.WriteObject(stream, new Settings { SettingsWindowBounds = bounds, SettingsWindowMaximized = true });
+            stream.Position = 0;
+            var saved = (Settings)serializer.ReadObject(stream);
+            Check(saved.SettingsWindowBounds == bounds && saved.SettingsWindowMaximized,
+                "Window position, size, and maximized state should survive saving and reloading");
+        }
+
+        var area = new Rectangle(-1920, 0, 1920, 1040);
+        var minimum = new Size(742, 516);
+        var defaultSize = new Size(946, 664);
+        Check(ModernSettingsForm.FitWindowBounds(bounds, area, minimum, defaultSize) == bounds,
+            "Saved placement should be preserved on a monitor left of the primary one");
+        Check(ModernSettingsForm.FitWindowBounds(new Rectangle(-80, 810, 900, 580), area, minimum, defaultSize) ==
+            new Rectangle(-900, 460, 900, 580), "Partially off-screen windows should move inside the work area");
+        Check(ModernSettingsForm.FitWindowBounds(bounds, new Rectangle(0, 0, 1280, 720), minimum, defaultSize) ==
+            new Rectangle(190, 70, 900, 580), "A disconnected monitor should recenter the window on the available monitor");
+        var smallArea = new Rectangle(100, 50, 640, 480);
+        Check(ModernSettingsForm.FitWindowBounds(Rectangle.Empty, smallArea, minimum, defaultSize) == smallArea,
+            "The default window should fit a screen smaller than its minimum size");
     }
 
     private static void CheckSavedGamingMode()

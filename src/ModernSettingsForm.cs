@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 internal sealed class ModernSettingsForm : Form
@@ -33,6 +34,10 @@ internal sealed class ModernSettingsForm : Form
     private AppearanceMode appearance;
     private Hotkey convert, expand;
     private SettingsButton recording;
+    private FormWindowState unminimizedState;
+
+    [DllImport("user32.dll")]
+    private static extern bool RedrawWindow(IntPtr window, IntPtr updateRectangle, IntPtr updateRegion, uint flags);
 
     internal ModernSettingsForm(Settings settings, KeyboardEngine engine, Icon appIcon, Action<Settings> apply)
     {
@@ -46,13 +51,12 @@ internal sealed class ModernSettingsForm : Form
 
         Text = Program.Name;
         Icon = appIcon;
-        StartPosition = FormStartPosition.CenterScreen;
+        StartPosition = FormStartPosition.Manual;
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = bodyFont;
         ClientSize = new Size(930, 625);
         MinimumSize = new Size(742, 516);
-        DoubleBuffered = true;
         KeyPreview = true;
 
         var shell = Table(2);
@@ -123,6 +127,75 @@ internal sealed class ModernSettingsForm : Form
         TrackScrollbars(this);
         ApplyTheme();
         SystemEvents.UserPreferenceChanged += UserPreferenceChanged;
+    }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            const int composited = 0x02000000; // WS_EX_COMPOSITED buffers the child controls with the form.
+            parameters.ExStyle |= composited;
+            return parameters;
+        }
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        SettingsTheme.SetWindowCloaked(Handle, true);
+        var saved = original.SettingsWindowBounds;
+        var screen = saved.Width > 0 && saved.Height > 0 ? Screen.FromRectangle(saved) : Screen.FromPoint(Cursor.Position);
+        var area = screen.WorkingArea;
+        MinimumSize = new Size(Math.Min(MinimumSize.Width, area.Width), Math.Min(MinimumSize.Height, area.Height));
+        Bounds = FitWindowBounds(saved, area, MinimumSize, Size);
+        if (original.SettingsWindowMaximized) WindowState = FormWindowState.Maximized;
+        base.OnLoad(e);
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        const uint redrawAllNow = 0x0001 | 0x0004 | 0x0080 | 0x0100; // Invalidate, erase, and paint every child synchronously.
+        RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, redrawAllNow);
+        SettingsTheme.SetWindowCloaked(Handle, false);
+        Activate();
+        base.OnShown(e);
+    }
+
+    internal static Rectangle FitWindowBounds(Rectangle saved, Rectangle area, Size minimum, Size defaultSize)
+    {
+        bool hasSavedSize = saved.Width > 0 && saved.Height > 0;
+        var size = hasSavedSize ? saved.Size : defaultSize;
+        int width = Math.Min(area.Width, Math.Max(minimum.Width, size.Width));
+        int height = Math.Min(area.Height, Math.Max(minimum.Height, size.Height));
+        if (hasSavedSize && area.IntersectsWith(saved))
+        {
+            int left = Math.Max(area.Left, Math.Min(saved.Left, area.Right - width));
+            int top = Math.Max(area.Top, Math.Min(saved.Top, area.Bottom - height));
+            return new Rectangle(left, top, width, height);
+        }
+        return new Rectangle(area.Left + (area.Width - width) / 2, area.Top + (area.Height - height) / 2, width, height);
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        if (WindowState != FormWindowState.Minimized) unminimizedState = WindowState;
+        base.OnResize(e);
+    }
+
+    internal void BringForward()
+    {
+        if (WindowState == FormWindowState.Minimized) WindowState = unminimizedState;
+        Activate();
+    }
+
+    internal bool RememberPlacement(Settings settings)
+    {
+        var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+        bool maximized = unminimizedState == FormWindowState.Maximized;
+        if (bounds == settings.SettingsWindowBounds && maximized == settings.SettingsWindowMaximized) return false;
+        settings.SettingsWindowBounds = bounds;
+        settings.SettingsWindowMaximized = maximized;
+        return true;
     }
 
     private SettingsButton Nav(string text, string glyph, int index)
@@ -466,6 +539,7 @@ internal sealed class ModernSettingsForm : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
+        SettingsTheme.DisableWindowTransitions(Handle);
         if (theme != null) theme.ApplyCaption(Handle);
     }
 
@@ -503,6 +577,7 @@ internal sealed class ModernSettingsForm : Form
         }
         try
         {
+            RememberPlacement(settings);
             apply(settings);
             status.Text = "Changes saved.";
         }

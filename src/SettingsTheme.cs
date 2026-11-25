@@ -63,16 +63,34 @@ internal sealed class SettingsTheme
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
+
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int SetWindowTheme(IntPtr window, string application, string classes);
+
+    internal static void DisableWindowTransitions(IntPtr handle)
+    {
+        int disabled = 1;
+        DwmSetWindowAttribute(handle, 3, ref disabled, sizeof(int)); // DWMWA_TRANSITIONS_FORCEDISABLED
+    }
+
+    internal static void SetWindowCloaked(IntPtr handle, bool cloaked)
+    {
+        if (!cloaked) DwmFlush();
+        int value = cloaked ? 1 : 0;
+        DwmSetWindowAttribute(handle, 13, ref value, sizeof(int)); // DWMWA_CLOAK
+    }
 
     internal void ApplyCaption(IntPtr handle)
     {
         int dark = Dark ? 1 : 0;
         if (DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int)) != 0)
             DwmSetWindowAttribute(handle, 19, ref dark, sizeof(int));
+        int border = HighContrast ? -1 : ColorTranslator.ToWin32(Border);
         int caption = HighContrast ? -1 : ColorTranslator.ToWin32(Rail);
         int text = HighContrast ? -1 : ColorTranslator.ToWin32(Text);
+        DwmSetWindowAttribute(handle, 34, ref border, sizeof(int));
         DwmSetWindowAttribute(handle, 35, ref caption, sizeof(int));
         DwmSetWindowAttribute(handle, 36, ref text, sizeof(int));
     }

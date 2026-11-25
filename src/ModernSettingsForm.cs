@@ -424,7 +424,8 @@ internal sealed class ModernSettingsForm : Form
         AddRow(rows, TextLabel("Start with only the tray icon visible.", true, SettingsCheckBox.LabelInset), 26, 10);
         AddRow(rows, closeToTray, 32, 0);
         AddRow(rows, TextLabel("Keep KeyRewind running when you close this window.", true, SettingsCheckBox.LabelInset), 26, 0);
-        AddRow(page, card, 160, 0);
+        AddRow(page, card, 160, 12);
+        AddRow(page, TextLabel("Version " + Application.ProductVersion, true), 28, 0);
     }
 
     private void AddTheme(TableLayoutPanel choices, AppearanceMode mode, string glyph)

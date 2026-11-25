@@ -12,9 +12,9 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle(Program.Name)]
 [assembly: AssemblyProduct(Program.Name)]
 [assembly: AssemblyDescription("Windows keyboard layout conversion and snippet expansion")]
-[assembly: AssemblyVersion("0.1.2.0")]
-[assembly: AssemblyFileVersion("0.1.2.0")]
-[assembly: AssemblyInformationalVersion("0.1.2")]
+[assembly: AssemblyVersion("0.2.0.0")]
+[assembly: AssemblyFileVersion("0.2.0.0")]
+[assembly: AssemblyInformationalVersion("0.2.0")]
 
 internal static class Program
 {
@@ -23,15 +23,19 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
         bool firstInstance;
         // Earlier builds must also release their input hooks before another instance starts.
         using (var singleInstance = new Mutex(true, "Local\\LayoutAndSnippets", out firstInstance))
         {
-            if (!firstInstance) return;
+            if (!firstInstance)
+            {
+                SettingsActivation.Request();
+                return;
+            }
             try
             {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
                 using (var stream = typeof(Program).Assembly.GetManifestResourceStream("KeyRewind.ico"))
                 using (var windowIcon = new Icon(stream, SystemInformation.IconSize))
                 using (var trayIcon = new Icon(windowIcon, SystemInformation.SmallIconSize))
@@ -48,6 +52,7 @@ internal sealed class TrayApp : ApplicationContext
 {
     private const string GamingModeTooltip = Program.Name + " — Gaming Mode on";
     private readonly Control dispatcher = new Control();
+    private readonly SettingsActivation activation;
     private readonly KeyboardEngine engine;
     private readonly NotifyIcon icon;
     private readonly TrayMenu menu;
@@ -79,6 +84,7 @@ internal sealed class TrayApp : ApplicationContext
             if (args.Button == MouseButtons.Left) OpenSettings();
         };
         if (!settings.LaunchInBackground) dispatcher.BeginInvoke((Action)OpenSettings);
+        activation = new SettingsActivation(OpenSettings);
     }
 
     private void ShowNotice(string message)
@@ -204,6 +210,7 @@ internal sealed class TrayApp : ApplicationContext
     {
         if (disposing)
         {
+            activation.Dispose();
             engine.Dispose();
             icon.Dispose();
             menu.Dispose();

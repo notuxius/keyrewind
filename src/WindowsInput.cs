@@ -105,7 +105,7 @@ internal static class WindowsInput
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowLong(IntPtr window, int index);
     [DllImport("user32.dll")] internal static extern bool IsWindowUnicode(IntPtr window);
     [DllImport("user32.dll")] internal static extern IntPtr GetKeyboardLayout(uint thread);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool PostMessage(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern bool PostMessage(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern uint MapVirtualKeyEx(uint code, uint type, IntPtr layout);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern short VkKeyScanEx(char character, IntPtr layout);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int ToUnicodeEx(uint key, uint scan, byte[] state, StringBuilder buffer, int count, uint flags, IntPtr layout);

@@ -392,39 +392,44 @@ internal class SettingsButton : Button
             }
         }
 
+        bool rtl = RightToLeft == RightToLeft.Yes;
+        var align = rtl ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left;
         var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
             TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
         if (dropdown != null)
         {
             int inset = ScaleDip(12);
-            int arrowX = Width - inset - ScaleDip(5);
+            int arrowInset = inset + ScaleDip(5);
+            int arrowX = rtl ? arrowInset : Width - arrowInset;
             int centerY = Height / 2;
             int arrowRise = ScaleDip(2) * (expanded ? -1 : 1);
             using (var pen = new Pen(expanded ? Theme.Accent : foreground, ScaleDip(1)))
                 e.Graphics.DrawLines(pen, new[] { new Point(arrowX - ScaleDip(4), centerY - arrowRise),
                     new Point(arrowX, centerY + arrowRise), new Point(arrowX + ScaleDip(4), centerY - arrowRise) });
-            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(inset, 0, Math.Max(0, arrowX - inset * 2), Height),
-                foreground, flags | TextFormatFlags.Left);
+            int textWidth = Math.Max(0, Width - arrowInset - inset * 2);
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(rtl ? Width - inset - textWidth : inset, 0, textWidth, Height),
+                foreground, flags | align);
         }
         else if (Glyph != null)
         {
             bool hasText = Text.Length != 0;
             int inset = ScaleDip(12);
             int iconWidth = ScaleDip(21);
-            var iconBounds = hasText ? new Rectangle(inset, 0, iconWidth, Height) : ClientRectangle;
+            var iconBounds = hasText ? new Rectangle(rtl ? Width - inset - iconWidth : inset, 0, iconWidth, Height) : ClientRectangle;
             using (var font = new Font("Segoe MDL2 Assets", 11))
                 TextRenderer.DrawText(e.Graphics, Glyph, font, iconBounds, foreground,
                     TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
             if (hasText)
             {
-                var textBounds = new Rectangle(inset + iconWidth + ScaleDip(7), 0,
+                var textBounds = new Rectangle(rtl ? inset : inset + iconWidth + ScaleDip(7), 0,
                     Math.Max(0, Width - inset * 2 - iconWidth - ScaleDip(7)), Height);
-                TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, foreground, flags | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, foreground, flags | align);
             }
         }
         else
         {
-            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, foreground, flags | TextFormatFlags.HorizontalCenter);
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, foreground, flags | TextFormatFlags.HorizontalCenter |
+                (rtl ? TextFormatFlags.RightToLeft : 0));
         }
         if (Focused && ShowFocusCues && !expanded)
         {

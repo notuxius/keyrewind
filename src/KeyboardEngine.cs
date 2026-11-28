@@ -370,33 +370,24 @@ internal sealed class KeyboardEngine : IDisposable
     private void CompleteConversion(InputTarget target, IntPtr original, IntPtr destination, bool showPopup, string copied,
         InputLanguage[] installed, Func<bool> focused)
     {
-        if (original != destination && focused() && WindowsInput.GetKeyboardLayout(target.Thread) == original)
+        string layoutSwitch = null;
+        string layoutName = null;
+        if (original != destination)
         {
-            if (!WindowsInput.RequestKeyboardLayout(target, destination))
-                Notify("Windows could not switch to the converted layout.");
-            else if (showPopup)
+            bool switched = WindowsInput.SwitchKeyboardLayout(target, original, destination, focused);
+            if (showPopup && focused())
             {
-                ThreadPool.QueueUserWorkItem(_ => Notify(copied, LayoutSwitchMessage(target.Thread, destination, installed, focused)));
-                return;
+                if (switched)
+                {
+                    var language = installed.FirstOrDefault(item => item.Handle == destination);
+                    layoutSwitch = language == null ? "Keyboard layout switched." : "Switched keyboard layout to {0}.";
+                    if (language != null) layoutName = language.LayoutName;
+                }
+                else if (WindowsInput.GetKeyboardLayout(target.Thread) == original)
+                    layoutSwitch = "Windows could not switch to the converted layout.";
             }
         }
-        if (copied != null) Notify(copied);
-    }
-
-    private string LayoutSwitchMessage(uint thread, IntPtr destination, InputLanguage[] installed, Func<bool> focused)
-    {
-        var timer = Stopwatch.StartNew();
-        while (focused())
-        {
-            if (WindowsInput.GetKeyboardLayout(thread) == destination)
-            {
-                var language = installed.FirstOrDefault(item => item.Handle == destination);
-                return language == null ? "Keyboard layout switched." : "Switched keyboard layout to " + language.LayoutName + ".";
-            }
-            if (timer.ElapsedMilliseconds >= 400) break;
-            Thread.Sleep(10);
-        }
-        return null;
+        if (copied != null || layoutSwitch != null) Notify(copied, layoutSwitch, layoutName);
     }
 
     private string CopySelection(ClipboardSession clipboard, InputTarget target, TargetKind kind, Func<bool> current)
@@ -469,15 +460,19 @@ internal sealed class KeyboardEngine : IDisposable
         return true;
     }
 
-    private void Notify(string message, string layoutSwitch = null)
+    private void Notify(string message, string layoutSwitch = null, string layoutName = null)
     {
         if (enabled && !dispatcher.IsDisposed)
             dispatcher.BeginInvoke((Action)(() =>
             {
                 if (!enabled) return;
+                string text = message == null ? null : UiText.Get(message);
                 if (settings.ShowAutoswitchPopups && layoutSwitch != null)
-                    message = message == null ? layoutSwitch : message + " " + layoutSwitch;
-                if (message != null) notice(message);
+                {
+                    string switched = UiText.Get(layoutSwitch, layoutName);
+                    text = text == null ? switched : text + " " + switched;
+                }
+                if (text != null) notice(text);
             }));
     }
 

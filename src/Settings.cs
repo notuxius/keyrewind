@@ -57,6 +57,7 @@ internal sealed class Settings
     [DataMember] public int LayoutB;
     [DataMember] public bool ShowAutoswitchPopups = true;
     [DataMember(EmitDefaultValue = false)] public AppearanceMode Appearance;
+    [DataMember(EmitDefaultValue = false)] public string Language;
     [DataMember(EmitDefaultValue = false)] public bool GamingMode;
     [DataMember(EmitDefaultValue = false)] public bool LaunchInBackground;
     [DataMember(EmitDefaultValue = false)] public bool ExitOnClose;
@@ -74,6 +75,24 @@ internal sealed class Settings
 
     [OnDeserializing]
     private void SetDefaults(StreamingContext context) { ShowAutoswitchPopups = true; }
+
+    internal static string ReadLanguage()
+    {
+        try
+        {
+            using (var stream = File.OpenRead(ReadPath))
+            {
+                var settings = (Settings)Serializer.ReadObject(stream);
+                return settings == null ? null : settings.Language;
+            }
+        }
+        catch (Exception error)
+        {
+            if (!(error is IOException || error is UnauthorizedAccessException || error is SerializationException ||
+                error is System.Security.SecurityException)) throw;
+            return null;
+        }
+    }
 
     internal static Settings Load(string path = null)
     {
@@ -104,6 +123,7 @@ internal sealed class Settings
         }
         if (settings == null) throw new InvalidDataException("The settings file is empty.");
         if (!Enum.IsDefined(typeof(AppearanceMode), settings.Appearance)) settings.Appearance = AppearanceMode.System;
+        settings.Language = UiText.Normalize(settings.Language);
         settings.Validate();
         return settings;
     }

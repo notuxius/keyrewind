@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -15,6 +16,13 @@ internal sealed class SettingsActivation : NativeWindow, IDisposable
     {
         this.openSettings = openSettings;
         CreateHandle(new CreateParams { Parent = MessageOnlyParent, Caption = WindowName });
+        // A standard-user launcher can only ask this elevated window to show Settings.
+        if (Program.RunningAsAdministrator && !ChangeWindowMessageFilterEx(Handle, ShowSettingsMessage, 1, IntPtr.Zero))
+        {
+            var error = new Win32Exception();
+            DestroyHandle();
+            throw error;
+        }
     }
 
     internal static void Request()
@@ -48,4 +56,6 @@ internal sealed class SettingsActivation : NativeWindow, IDisposable
     private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string caption);
     [DllImport("user32.dll")]
     private static extern bool AllowSetForegroundWindow(uint process);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(IntPtr window, uint message, uint action, IntPtr changeInfo);
 }

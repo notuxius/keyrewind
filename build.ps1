@@ -17,14 +17,22 @@ $references = @('System.Windows.Forms.dll', 'System.Drawing.dll', 'System.Runtim
 
 $exe = Join-Path $output 'KeyRewind.exe'
 $icon = Join-Path $PSScriptRoot 'assets\KeyRewind.ico'
-$iconOptions = @("/win32icon:$icon", "/resource:$icon,KeyRewind.ico")
-& $compiler /nologo /warnaserror+ /optimize+ /target:winexe /platform:anycpu /codepage:65001 "/out:$exe" @iconOptions @references @sources
+$resources = @("/win32icon:$icon", "/resource:$icon,KeyRewind.ico") + @(
+    Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'locales') -Filter '*.json' |
+        ForEach-Object { "/resource:$($_.FullName),locales.$($_.Name)" }
+)
+& $compiler /nologo /warnaserror+ /optimize+ /target:winexe /platform:anycpu /codepage:65001 "/out:$exe" @resources @references @sources
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+
+$adminShortcut = Join-Path $output 'KeyRewind (Administrator).lnk'
+# The shortcut resolves KeyRewind.exe relative to its own location.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'assets\KeyRewind (Administrator).lnk') -Destination $adminShortcut -Force
+Compress-Archive -LiteralPath $exe,$adminShortcut -DestinationPath (Join-Path $output 'KeyRewind.zip') -Force
 
 if ($Test) {
     $testExe = Join-Path $output 'SmokeTests.exe'
     $tests = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'tests') -Filter '*.cs' | ForEach-Object FullName)
-    & $compiler /nologo /warnaserror+ /optimize+ /target:exe /platform:anycpu /codepage:65001 /main:SmokeTests "/out:$testExe" @iconOptions @references @sources @tests
+    & $compiler /nologo /warnaserror+ /optimize+ /target:exe /platform:anycpu /codepage:65001 /main:SmokeTests "/out:$testExe" @resources @references @sources @tests
     if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed.' }

@@ -21,15 +21,16 @@ internal sealed class ModernSettingsForm : Form
     private readonly Panel[] pages = new Panel[4];
     private readonly SettingsButton[] themes = new SettingsButton[3];
     private readonly SettingsDropdown layoutA, layoutB;
-    private readonly SettingsCheckBox autoswitchPopups = new SettingsCheckBox("Show autoswitch popups");
+    private readonly SettingsDropdown language = new SettingsDropdown(UiText.Get("Language"));
+    private readonly SettingsCheckBox autoswitchPopups = new SettingsCheckBox(UiText.Get("Show autoswitch popups"));
     private readonly DataGridView snippets = new DataGridView();
     private readonly ContextMenuStrip textMenu = new ContextMenuStrip { ShowImageMargin = false };
     private readonly Hotkey defaultConvert = Settings.CreateDefaultConvert();
     private readonly ToolTip shortcutTips = new ToolTip();
     private readonly SettingsButton convertButton, expandButton, resetConvert, resetExpand;
-    private readonly SettingsCheckBox startWithWindows = new SettingsCheckBox("Start with Windows");
-    private readonly SettingsCheckBox launchInBackground = new SettingsCheckBox("Launch in background");
-    private readonly SettingsCheckBox closeToTray = new SettingsCheckBox("Close to tray");
+    private readonly SettingsCheckBox startWithWindows = new SettingsCheckBox(UiText.Get("Start with Windows"));
+    private readonly SettingsCheckBox launchInBackground = new SettingsCheckBox(UiText.Get("Launch in background"));
+    private readonly SettingsCheckBox closeToTray = new SettingsCheckBox(UiText.Get("Close to tray"));
     private readonly Label status = TextLabel("", true);
     private readonly InputLanguage[] installed;
     private SettingsTheme theme;
@@ -58,6 +59,7 @@ internal sealed class ModernSettingsForm : Form
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = bodyFont;
+        RightToLeft = UiText.Direction;
         ClientSize = new Size(930, 625);
         MinimumSize = new Size(742, 516);
         KeyPreview = true;
@@ -73,10 +75,10 @@ internal sealed class ModernSettingsForm : Form
         var menu = Table(1);
         menu.Dock = DockStyle.Top;
         rail.Controls.Add(menu);
-        AddRow(menu, Nav("Shortcuts", "\uE765", 0), 43, 4);
-        AddRow(menu, Nav("Snippets", "\uE8C8", 1), 43, 4);
-        AddRow(menu, Nav("Appearance", "\uE706", 2), 43, 4);
-        AddRow(menu, Nav("General", "\uE713", 3), 43, 4);
+        AddRow(menu, Nav(UiText.Get("Shortcuts"), "\uE765", 0), 43, 4);
+        AddRow(menu, Nav(UiText.Get("Snippets"), "\uE8C8", 1), 43, 4);
+        AddRow(menu, Nav(UiText.Get("Appearance"), "\uE706", 2), 43, 4);
+        AddRow(menu, Nav(UiText.Get("General"), "\uE713", 3), 43, 4);
 
         var workspace = Table(1);
         workspace.Dock = DockStyle.Fill;
@@ -86,24 +88,26 @@ internal sealed class ModernSettingsForm : Form
         shell.Controls.Add(workspace, 1, 0);
         var viewport = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
         workspace.Controls.Add(viewport, 0, 0);
-        var shortcuts = Page(viewport, 0, "Shortcuts", "Choose your keyboard layouts and the keys that trigger each action.");
-        var snippetPage = Page(viewport, 1, "Snippets", "Type an abbreviation and use your snippet shortcut.");
-        var appearancePage = Page(viewport, 2, "Appearance", "Preview a theme before saving it.");
-        var generalPage = Page(viewport, 3, "General", "Reopen Settings from the tray icon.");
+        var shortcuts = Page(viewport, 0, UiText.Get("Shortcuts"), UiText.Get("Choose your keyboard layouts and the keys that trigger each action."));
+        var snippetPage = Page(viewport, 1, UiText.Get("Snippets"), UiText.Get("Type an abbreviation and use your snippet shortcut."));
+        var appearancePage = Page(viewport, 2, UiText.Get("Appearance"), UiText.Get("Preview a theme before saving it."));
+        var generalPage = Page(viewport, 3, UiText.Get("General"), UiText.Get("Reopen Settings from the tray icon."));
 
-        layoutA = new SettingsDropdown("First keyboard layout");
-        layoutB = new SettingsDropdown("Second keyboard layout");
+        layoutA = new SettingsDropdown(UiText.Get("First keyboard layout"));
+        layoutB = new SettingsDropdown(UiText.Get("Second keyboard layout"));
         autoswitchPopups.Checked = settings.ShowAutoswitchPopups;
         AddRow(shortcuts, BuildLayoutCard(), 179, 14);
         TableLayoutPanel shortcutRows;
         var shortcutCard = Card(out shortcutRows);
-        AddRow(shortcutRows, Heading("Keyboard shortcuts"), 30, 0);
-        resetConvert = ResetShortcutButton("Reset conversion shortcut to " + defaultConvert,
+        AddRow(shortcutRows, Heading(UiText.Get("Keyboard shortcuts")), 30, 0);
+        resetConvert = ResetShortcutButton(UiText.Get("Reset conversion shortcut to {0}", defaultConvert),
             delegate { StopRecording(); convert = defaultConvert; RefreshShortcuts(); });
-        resetExpand = ResetShortcutButton("Reset snippet shortcut to Double Space",
+        resetExpand = ResetShortcutButton(UiText.Get("Reset snippet shortcut to Double Space"),
             delegate { StopRecording(); expand = null; RefreshShortcuts(); });
-        AddRow(shortcutRows, ShortcutRow("Convert selection", resetConvert, out convertButton), 44, 3);
-        AddRow(shortcutRows, ShortcutRow("Expand snippet", resetExpand, out expandButton), 44, 3);
+        AddRow(shortcutRows, ShortcutRow(UiText.Get("Convert selection"), UiText.Get("Record conversion shortcut"),
+            resetConvert, out convertButton), 44, 3);
+        AddRow(shortcutRows, ShortcutRow(UiText.Get("Expand snippet"), UiText.Get("Record snippet shortcut"),
+            resetExpand, out expandButton), 44, 3);
         convertButton.Click += delegate { StartRecording(convertButton); };
         expandButton.Click += delegate { StartRecording(expandButton); };
         convertButton.LostFocus += delegate { StopRecording(); };
@@ -119,9 +123,9 @@ internal sealed class ModernSettingsForm : Form
         footer.Dock = DockStyle.Fill;
         footer.Padding = new Padding(34, 10, 34, 14);
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 143));
         footer.Controls.Add(status, 0, 0);
-        var save = Button("Save changes", null, delegate { SaveChanges(); });
+        var save = Button(UiText.Get("Save changes"), null, delegate { if (SaveChanges()) Close(); });
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ButtonWidth(save.Text, 143)));
         save.Appearance = SettingsButtonStyle.Primary;
         footer.Controls.Add(save, 1, 0);
         workspace.Controls.Add(footer, 0, 1);
@@ -239,11 +243,11 @@ internal sealed class ModernSettingsForm : Form
     {
         TableLayoutPanel rows;
         var card = Card(out rows);
-        AddRow(rows, Heading("Autoswitch layouts"), 27, 0);
+        AddRow(rows, Heading(UiText.Get("Autoswitch layouts")), 27, 0);
         bool canChoose = installed.Length > 2;
-        string description = installed.Length == 2 ? "Both installed layouts are selected automatically."
-            : canChoose ? "Choose which two layouts the conversion shortcut switches between."
-            : "Install a second keyboard layout in Windows to use conversion.";
+        string description = installed.Length == 2 ? UiText.Get("Both installed layouts are selected automatically.")
+            : canChoose ? UiText.Get("Choose which two layouts the conversion shortcut switches between.")
+            : UiText.Get("Install a second keyboard layout in Windows to use conversion.");
         AddRow(rows, TextLabel(description, true), 31, 4);
         if (!canChoose)
         {
@@ -272,7 +276,7 @@ internal sealed class ModernSettingsForm : Form
 
     private void FillLayout(SettingsDropdown picker, IntPtr selected)
     {
-        picker.AddOption("Choose a layout");
+        picker.AddOption(UiText.Get("Choose a layout"));
         foreach (var layout in installed) picker.AddOption(layout.Culture.DisplayName + " · " + layout.LayoutName);
         picker.SelectOption(Array.FindIndex(installed, layout => layout.Handle == selected) + 1);
     }
@@ -282,7 +286,7 @@ internal sealed class ModernSettingsForm : Form
         return picker.SelectedIndex <= 0 ? 0 : LayoutConverter.LayoutId(installed[picker.SelectedIndex - 1].Handle);
     }
 
-    private static TableLayoutPanel ShortcutRow(string title, SettingsButton reset, out SettingsButton shortcut)
+    private static TableLayoutPanel ShortcutRow(string title, string recordingName, SettingsButton reset, out SettingsButton shortcut)
     {
         var row = Table(3);
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -290,7 +294,7 @@ internal sealed class ModernSettingsForm : Form
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 52));
         row.Controls.Add(TextLabel(title, false), 0, 0);
         shortcut = Button("", null, null);
-        shortcut.AccessibleName = "Record shortcut for " + title.ToLowerInvariant();
+        shortcut.AccessibleName = recordingName;
         row.Controls.Add(shortcut, 1, 0);
         row.Controls.Add(reset, 2, 0);
         return row;
@@ -309,7 +313,7 @@ internal sealed class ModernSettingsForm : Form
     {
         convertButton.Text = convert.ToString();
         convertButton.AccessibleDescription = convertButton.Text;
-        expandButton.Text = expand == null ? "Double Space" : expand.ToString();
+        expandButton.Text = expand == null ? UiText.Get("Double Space") : expand.ToString();
         expandButton.AccessibleDescription = expandButton.Text;
         resetConvert.Enabled = !convert.Matches(defaultConvert.Key, defaultConvert.Modifiers);
         resetExpand.Enabled = expand != null;
@@ -319,8 +323,8 @@ internal sealed class ModernSettingsForm : Form
     {
         StopRecording();
         recording = button;
-        recording.Text = "Press keys…";
-        status.Text = "Press the shortcut you want to use, or press Esc to cancel.";
+        recording.Text = UiText.Get("Press keys…");
+        status.Text = UiText.Get("Press the shortcut you want to use, or press Esc to cancel.");
         if (engine.Enabled)
         {
             engine.Recorded = hotkey =>
@@ -371,7 +375,7 @@ internal sealed class ModernSettingsForm : Form
             (win ? WindowsInput.Win : 0);
         var hotkey = new Hotkey { Key = key, Modifiers = modifiers };
         if (!altGr && key != (int)Keys.CapsLock && hotkey.Valid()) CompleteRecording(hotkey);
-        else status.Text = InvalidShortcutMessage;
+        else status.Text = UiText.Get(InvalidShortcutMessage);
         return true;
     }
 
@@ -380,7 +384,7 @@ internal sealed class ModernSettingsForm : Form
         if (recording != null && !WindowsInput.ModifierKey(e.KeyValue))
         {
             e.SuppressKeyPress = true;
-            status.Text = InvalidShortcutMessage;
+            status.Text = UiText.Get(InvalidShortcutMessage);
         }
         base.OnKeyDown(e);
     }
@@ -391,27 +395,27 @@ internal sealed class ModernSettingsForm : Form
         var card = Card(out rows);
         var actions = Table(3);
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
-        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 113));
-        actions.Controls.Add(Heading("Saved snippets"), 0, 0);
-        var remove = Button("Remove", null, delegate
+        actions.Controls.Add(Heading(UiText.Get("Saved snippets")), 0, 0);
+        var remove = Button(UiText.Get("Remove"), null, delegate
         {
             if (snippets.CurrentRow != null) snippets.Rows.Remove(snippets.CurrentRow);
         });
-        remove.AccessibleName = "Remove selected snippet";
-        remove.Margin = new Padding(0, 0, 7, 0);
+        remove.AccessibleName = UiText.Get("Remove selected snippet");
+        remove.Margin = RightToLeft == RightToLeft.Yes ? new Padding(7, 0, 0, 0) : new Padding(0, 0, 7, 0);
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ButtonWidth(remove.Text, 88) + 7));
         actions.Controls.Add(remove, 1, 0);
-        var add = Button("Add snippet", null, delegate
+        var add = Button(UiText.Get("Add snippet"), null, delegate
         {
             snippets.CurrentCell = snippets.Rows[snippets.Rows.Add()].Cells[0];
             snippets.Focus();
             snippets.BeginEdit(true);
         });
         add.Appearance = SettingsButtonStyle.Primary;
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ButtonWidth(add.Text, 113)));
         actions.Controls.Add(add, 2, 0);
         AddRow(rows, actions, 36, 10);
 
-        snippets.AccessibleName = "Snippets";
+        snippets.AccessibleName = UiText.Get("Snippets");
         snippets.AllowUserToAddRows = false;
         snippets.AllowUserToResizeRows = false;
         snippets.AllowUserToOrderColumns = false;
@@ -426,8 +430,8 @@ internal sealed class ModernSettingsForm : Form
         snippets.RowTemplate.Height = 33;
         snippets.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         snippets.DefaultCellStyle.Padding = new Padding(6, 0, 0, 0);
-        snippets.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Abbreviation", FillWeight = 30, MaxInputLength = 64, SortMode = DataGridViewColumnSortMode.NotSortable });
-        snippets.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Replacement text", FillWeight = 70, MaxInputLength = 4096, SortMode = DataGridViewColumnSortMode.NotSortable });
+        snippets.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = UiText.Get("Abbreviation"), FillWeight = 30, MaxInputLength = 64, SortMode = DataGridViewColumnSortMode.NotSortable });
+        snippets.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = UiText.Get("Replacement text"), FillWeight = 70, MaxInputLength = 4096, SortMode = DataGridViewColumnSortMode.NotSortable });
         foreach (var snippet in settings.Snippets) snippets.Rows.Add(snippet.Trigger, snippet.Text);
         snippets.SelectionChanged += delegate { remove.Enabled = snippets.CurrentRow != null; };
         remove.Enabled = snippets.Rows.Count != 0;
@@ -445,14 +449,14 @@ internal sealed class ModernSettingsForm : Form
 
     private void BuildTextMenu()
     {
-        var undo = AddTextAction("Undo", editor => editor.Undo());
+        var undo = AddTextAction(UiText.Get("Undo"), editor => editor.Undo());
         textMenu.Items.Add(new ToolStripSeparator());
-        var cut = AddTextAction("Cut", editor => editor.Cut());
-        var copy = AddTextAction("Copy", editor => editor.Copy());
-        AddTextAction("Paste", editor => editor.Paste());
-        var delete = AddTextAction("Delete", editor => editor.SelectedText = "");
+        var cut = AddTextAction(UiText.Get("Cut"), editor => editor.Cut());
+        var copy = AddTextAction(UiText.Get("Copy"), editor => editor.Copy());
+        AddTextAction(UiText.Get("Paste"), editor => editor.Paste());
+        var delete = AddTextAction(UiText.Get("Delete"), editor => editor.SelectedText = "");
         textMenu.Items.Add(new ToolStripSeparator());
-        AddTextAction("Select all", editor => editor.SelectAll());
+        AddTextAction(UiText.Get("Select all"), editor => editor.SelectAll());
         textMenu.Opening += (sender, args) =>
         {
             var editor = SnippetEditor;
@@ -480,8 +484,8 @@ internal sealed class ModernSettingsForm : Form
     {
         TableLayoutPanel rows;
         var card = Card(out rows);
-        AddRow(rows, Heading("Color theme"), 28, 0);
-        AddRow(rows, TextLabel("System matches the Windows app color setting.", true), 32, 5);
+        AddRow(rows, Heading(UiText.Get("Color theme")), 28, 0);
+        AddRow(rows, TextLabel(UiText.Get("System matches the Windows app color setting."), true), 32, 5);
         var choices = Table(3);
         for (int i = 0; i < 3; i++) choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
         AddTheme(choices, AppearanceMode.System, "\uE7F4");
@@ -505,24 +509,31 @@ internal sealed class ModernSettingsForm : Form
         TableLayoutPanel rows;
         var card = Card(out rows);
         AddRow(rows, startWithWindows, 32, 0);
-        AddRow(rows, TextLabel(startWithWindows.Enabled ? "Open KeyRewind when you sign in." :
-            "Windows startup settings are unavailable.", true, SettingsCheckBox.LabelInset), 26, 10);
+        AddRow(rows, TextLabel(startWithWindows.Enabled ? UiText.Get("Open KeyRewind when you sign in.") :
+            UiText.Get("Windows startup settings are unavailable."), true, SettingsCheckBox.LabelInset), 26, 10);
         AddRow(rows, launchInBackground, 32, 0);
-        AddRow(rows, TextLabel("Start with only the tray icon visible.", true, SettingsCheckBox.LabelInset), 26, 10);
+        AddRow(rows, TextLabel(UiText.Get("Start with only the tray icon visible."), true, SettingsCheckBox.LabelInset), 26, 10);
         AddRow(rows, closeToTray, 32, 0);
-        AddRow(rows, TextLabel("Keep KeyRewind running when you close this window.", true, SettingsCheckBox.LabelInset), 26, 0);
+        AddRow(rows, TextLabel(UiText.Get("Keep KeyRewind running when you close this window."), true, SettingsCheckBox.LabelInset), 26, 0);
         AddRow(page, card, 228, 12);
-        AddRow(page, TextLabel("Version " + Application.ProductVersion, true), 28, 0);
+        var languageCard = Card(out rows);
+        AddRow(rows, Heading(UiText.Get("Language")), 28, 5);
+        foreach (var item in UiText.Languages) language.AddOption(item.Value);
+        string savedLanguage = UiText.Normalize(settings.Language);
+        language.SelectOption(Array.FindIndex(UiText.Languages, item => item.Key == savedLanguage));
+        AddRow(rows, language, 36, 0);
+        AddRow(page, languageCard, 103, 12);
+        AddRow(page, TextLabel(UiText.Get("Version {0}", Application.ProductVersion), true), 28, 0);
     }
 
     private void AddTheme(TableLayoutPanel choices, AppearanceMode mode, string glyph)
     {
-        var button = Button(mode.ToString(), glyph, delegate
+        var button = Button(UiText.Get(mode.ToString()), glyph, delegate
         {
             if (appearance == mode) return;
             appearance = mode;
             ApplyTheme();
-            status.Text = "Save changes to keep this theme.";
+            status.Text = UiText.Get("Save changes to keep this theme.");
         });
         int index = (int)mode;
         if (index != 2) button.Margin = new Padding(0, 0, 8, 0);
@@ -538,7 +549,7 @@ internal sealed class ModernSettingsForm : Form
         for (int i = 0; i < themes.Length; i++)
         {
             themes[i].Selected = (int)appearance == i;
-            themes[i].AccessibleDescription = themes[i].Selected ? "Selected theme" : "";
+            themes[i].AccessibleDescription = themes[i].Selected ? UiText.Get("Selected theme") : "";
         }
         if (IsHandleCreated) theme.ApplyCaption(Handle);
     }
@@ -572,6 +583,7 @@ internal sealed class ModernSettingsForm : Form
         if (!snippets.EndEdit()) return false;
         var current = ReadChanges();
         if (SameHotkey(current.Convert, lastSaved.Convert) && SameHotkey(current.Expand, lastSaved.Expand) &&
+            current.Language == lastSaved.Language &&
             current.Appearance == lastSaved.Appearance && current.ShowAutoswitchPopups == lastSaved.ShowAutoswitchPopups &&
             current.LaunchInBackground == lastSaved.LaunchInBackground && current.ExitOnClose == lastSaved.ExitOnClose &&
             current.LayoutA == lastSaved.LayoutA && current.LayoutB == lastSaved.LayoutB &&
@@ -583,21 +595,21 @@ internal sealed class ModernSettingsForm : Form
         BringForward();
         using (var prompt = new Form
         {
-            Text = "Save changes before updating?", Icon = Icon, Font = Font, AutoScaleMode = AutoScaleMode.Font,
+            Text = UiText.Get("Save changes before updating?"), Icon = Icon, Font = Font, AutoScaleMode = AutoScaleMode.Font,
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog, ShowInTaskbar = false, MaximizeBox = false,
-            MinimizeBox = false, BackColor = theme.Background, Padding = new Padding(16)
+            MinimizeBox = false, BackColor = theme.Background, Padding = new Padding(16), RightToLeft = RightToLeft
         })
         {
             var contents = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             contents.Controls.Add(new Label
             {
-                Text = "Settings has unsaved changes.", AutoSize = true, Margin = new Padding(3, 4, 3, 14)
+                Text = UiText.Get("Settings has unsaved changes."), AutoSize = true, Margin = new Padding(3, 4, 3, 14)
             });
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-            var save = new Button { Text = "Save", AutoSize = true, DialogResult = DialogResult.Yes };
-            var discard = new Button { Text = "Discard", AutoSize = true, DialogResult = DialogResult.No };
-            var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+            var save = new Button { Text = UiText.Get("Save"), AutoSize = true, DialogResult = DialogResult.Yes };
+            var discard = new Button { Text = UiText.Get("Discard"), AutoSize = true, DialogResult = DialogResult.No };
+            var cancel = new Button { Text = UiText.Get("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { save, discard, cancel });
             contents.Controls.Add(buttons);
             prompt.Controls.Add(contents);
@@ -620,6 +632,7 @@ internal sealed class ModernSettingsForm : Form
         return new Settings
         {
             Convert = convert, Expand = expand, Appearance = appearance,
+            Language = UiText.Languages[language.SelectedIndex].Key,
             ShowAutoswitchPopups = autoswitchPopups.Checked,
             LaunchInBackground = launchInBackground.Checked, ExitOnClose = !closeToTray.Checked,
             LayoutA = installed.Length > 2 ? SelectedLayout(layoutA) : original.LayoutA,
@@ -640,7 +653,7 @@ internal sealed class ModernSettingsForm : Form
             (settings.LayoutA == 0 || settings.LayoutB == 0 || settings.LayoutA == settings.LayoutB))
         {
             ShowPage(0);
-            status.Text = "Choose two different layouts or clear both selections.";
+            status.Text = UiText.Get("Choose two different layouts or clear both selections.");
             return false;
         }
         try
@@ -653,20 +666,20 @@ internal sealed class ModernSettingsForm : Form
         {
             if (!(error is InvalidDataException || error is IOException || error is
                 UnauthorizedAccessException || error is SerializationException)) throw;
-            status.Text = error.Message;
+            status.Text = UiText.Get(error.Message);
             return false;
         }
         try
         {
             if (startWithWindows.Enabled)
                 startupCommand = WindowsStartup.Save(startWithWindows.Checked, startupCommand);
-            status.Text = "Changes saved.";
+            status.Text = UiText.Get("Changes saved.");
             return true;
         }
         catch (Exception error)
         {
             if (!WindowsStartup.IsAccessError(error)) throw;
-            status.Text = "Could not change Windows startup. " + error.Message;
+            status.Text = UiText.Get("Could not change Windows startup. {0}", UiText.Get(error.Message));
             return false;
         }
     }
@@ -710,7 +723,8 @@ internal sealed class ModernSettingsForm : Form
         return new Label
         {
             Text = text, Tag = muted ? "muted" : null, TextAlign = ContentAlignment.MiddleLeft,
-            Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(indent, 0, 0, 0),
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            Padding = UiText.Direction == RightToLeft.Yes ? new Padding(0, 0, indent, 0) : new Padding(indent, 0, 0, 0),
             UseMnemonic = false, AutoEllipsis = true
         };
     }
@@ -720,6 +734,11 @@ internal sealed class ModernSettingsForm : Form
         var button = new SettingsButton { Text = text, Glyph = glyph, Dock = DockStyle.Fill, Margin = Padding.Empty };
         if (click != null) button.Click += click;
         return button;
+    }
+
+    private int ButtonWidth(string text, int minimum)
+    {
+        return Math.Max(minimum, TextRenderer.MeasureText(text, bodyFont).Width + 20);
     }
 
     protected override void OnDeactivate(EventArgs e)

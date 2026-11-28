@@ -1,6 +1,7 @@
 using Microsoft.Win32.SafeHandles;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -16,7 +17,13 @@ internal static class StandardUserLaunch
     private const int MediumIntegrity = 0x2000;
     private const int CreateNoWindow = 0x08000000;
 
-    internal static bool RestartIfElevated()
+    internal static bool IsAdministrator()
+    {
+        using (var identity = WindowsIdentity.GetCurrent())
+            return IsAdministrator(identity);
+    }
+
+    internal static bool RestartIfElevated(Action<Process> afterStart = null)
     {
         using (var identity = WindowsIdentity.GetCurrent())
         {
@@ -41,7 +48,13 @@ internal static class StandardUserLaunch
                     Check(CreateProcessAsUser(token, Application.ExecutablePath, new StringBuilder(Environment.CommandLine),
                         IntPtr.Zero, IntPtr.Zero, false, CreateNoWindow, IntPtr.Zero, null, ref startup, out child));
                     CloseHandle(child.Thread);
-                    CloseHandle(child.Process);
+                    try
+                    {
+                        if (afterStart != null)
+                            using (var process = Process.GetProcessById(child.ProcessId))
+                                afterStart(process);
+                    }
+                    finally { CloseHandle(child.Process); }
                 }
             }
             finally { SaferCloseLevel(level); }
@@ -51,7 +64,7 @@ internal static class StandardUserLaunch
 
     private static bool HasStandardRights(WindowsIdentity identity)
     {
-        if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator)) return false;
+        if (IsAdministrator(identity)) return false;
 
         int size;
         GetTokenInformation(identity.Token, TokenIntegrityLevel, IntPtr.Zero, 0, out size);
@@ -64,6 +77,11 @@ internal static class StandardUserLaunch
             return Marshal.ReadInt32(GetSidSubAuthority(integritySid, 0)) <= MediumIntegrity;
         }
         finally { Marshal.FreeHGlobal(buffer); }
+    }
+
+    private static bool IsAdministrator(WindowsIdentity identity)
+    {
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
     private static void SetMediumIntegrity(SafeAccessTokenHandle token)

@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 internal static class SmokeTests
@@ -61,6 +62,7 @@ internal static class SmokeTests
         CheckDefaultSnippets();
         CheckLayoutPair();
         CheckAppearance();
+        CheckLocalization();
         CheckAutoswitchPopups();
         CheckWindowPreferences();
         CheckWindowsStartup();
@@ -71,6 +73,7 @@ internal static class SmokeTests
         CheckInputLifecycle();
         CheckNativeEditSelection();
         var installed = LayoutConverter.Installed();
+        CheckLayoutSwitchFallback(installed);
         var english = installed.FirstOrDefault(item => item.Culture.Name == "en-US");
         var ukrainian = installed.FirstOrDefault(item => item.Culture.Name == "uk-UA");
         if (english != null && ukrainian != null)
@@ -158,6 +161,65 @@ internal static class SmokeTests
                 stream.Position = 0;
                 Check(((Settings)serializer.ReadObject(stream)).Appearance == appearance, "The selected theme should survive saving");
             }
+        }
+    }
+
+    private static void CheckLocalization()
+    {
+        var codes = new[] { "ar", "bn", "zh", "arz", "en", "fr", "de", "hi", "id", "ja", "pcm", "pt", "ru", "es", "uk", "ur" };
+        Check(UiText.Languages.Select(item => item.Key).SequenceEqual(codes), "The picker should match Relf's language list");
+        var keys = UiText.Catalog("uk").Keys.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+        var settings = new Settings { GamingMode = true };
+        settings.Validate();
+        using (var dispatcher = new Control())
+        using (var engine = new KeyboardEngine(dispatcher, settings, message => { }))
+        foreach (string code in codes)
+        {
+            UiText.UseLanguage(code);
+            settings.Language = code;
+            using (var form = new ModernSettingsForm(settings, engine, null, update => { }))
+            {
+                Check(form.RightToLeft == UiText.Direction, "Settings should use the selected language's reading direction");
+                var picker = Descendants(form).OfType<SettingsDropdown>().Single(item => item.AccessibleName == UiText.Get("Language"));
+                Check(picker.Text == UiText.Languages.Single(item => item.Key == code).Value, "The picker should show the saved language's native name");
+                Check(Descendants(form).OfType<SettingsButton>().Any(button => button.Text == UiText.Get("Save changes")),
+                    "The Settings window should use the active catalog");
+            }
+            if (code == "en") continue;
+            var catalog = UiText.Catalog(code);
+            Check(catalog.Keys.OrderBy(key => key, StringComparer.Ordinal).SequenceEqual(keys), code + " needs every translation key");
+            foreach (string key in keys)
+            {
+                Check(!string.IsNullOrWhiteSpace(catalog[key]), code + " has a blank translation for " + key);
+                if (key.Contains("{0}"))
+                    Check(UiText.Get(key, "test-value").Contains("test-value"), code + " lost a placeholder in " + key);
+            }
+        }
+        UiText.UseLanguage("unsupported");
+        Check(UiText.Language == "en" && UiText.Get("Save changes") == "Save changes", "An unsupported language should use English");
+
+        string path = Path.Combine(Path.GetTempPath(), "KeyRewind-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Check(Settings.Load(path).Language == "en", "A fresh install should open in English");
+            File.WriteAllText(path, "{\"Convert\":{\"Key\":90,\"Modifiers\":5},\"Snippets\":[]}");
+            Check(Settings.Load(path).Language == "en", "Older settings should open in English");
+            var serializer = new DataContractJsonSerializer(typeof(Settings));
+            settings.Language = "arz";
+            settings.Snippets.Add(new Snippet { Trigger = "test", Text = "Hello!" });
+            using (var stream = File.Create(path)) serializer.WriteObject(stream, settings);
+            var saved = Settings.Load(path);
+            Check(saved.Language == "arz" && saved.Expansions["test"] == "Hello!", "Saving a language should preserve snippet content");
+        }
+        finally { File.Delete(path); }
+    }
+
+    private static System.Collections.Generic.IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (Control nested in Descendants(child)) yield return nested;
         }
     }
 
@@ -381,6 +443,63 @@ internal static class SmokeTests
             var selection = Selection.Read(target, TargetKind.Editor);
             Check(selection != null && selection.Text.Length == 0, "Password text must not be read for conversion");
         }
+    }
+
+    private static void CheckLayoutSwitchFallback(InputLanguage[] installed)
+    {
+        var original = InputLanguage.CurrentInputLanguage;
+        var destination = installed.FirstOrDefault(item => item.Handle != original.Handle);
+        if (destination == null)
+        {
+            Console.WriteLine("Layout switch fallback test skipped because a second layout is absent.");
+            return;
+        }
+
+        using (var main = new LayoutRequestWindow(destination))
+        using (var child = new LayoutRequestWindow(null, main.Handle))
+        {
+            uint process;
+            var target = new InputTarget { Window = main.Handle, Focus = child.Handle,
+                Thread = WindowsInput.GetWindowThreadProcessId(child.Handle, out process) };
+            try
+            {
+                var switched = Task.Run(() => WindowsInput.SwitchKeyboardLayout(target, original.Handle, destination.Handle, () => true));
+                while (!switched.IsCompleted)
+                {
+                    Application.DoEvents();
+                    Thread.Sleep(5);
+                }
+                Check(switched.Result && child.ReceivedRequest && main.ReceivedRequest,
+                    "Retry a layout change through the main window when the focused child ignores the request");
+                Check(InputLanguage.CurrentInputLanguage.Handle == destination.Handle, "Confirm that Windows changed the layout");
+            }
+            finally { InputLanguage.CurrentInputLanguage = original; }
+        }
+    }
+
+    private sealed class LayoutRequestWindow : NativeWindow, IDisposable
+    {
+        private readonly InputLanguage acceptedLayout;
+        internal bool ReceivedRequest;
+
+        internal LayoutRequestWindow(InputLanguage acceptedLayout, IntPtr parent = default(IntPtr))
+        {
+            this.acceptedLayout = acceptedLayout;
+            CreateHandle(new CreateParams { Parent = parent, Style = parent == IntPtr.Zero ? 0 : 0x40000000 });
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (message.Msg == 0x0050)
+            {
+                ReceivedRequest = true;
+                if (acceptedLayout != null) InputLanguage.CurrentInputLanguage = acceptedLayout;
+                return;
+            }
+            base.WndProc(ref message);
+        }
+
+        public void Dispose() { DestroyHandle(); }
     }
 
     internal static void Check(bool pass, string message)

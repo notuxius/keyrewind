@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 internal enum TargetKind { Editor, Terminal, Console }
@@ -129,11 +131,24 @@ internal static class WindowsInput
 
     internal static bool Down(int key) { return GetAsyncKeyState(key) < 0; }
 
-    internal static bool RequestKeyboardLayout(InputTarget target, IntPtr layout)
+    internal static bool SwitchKeyboardLayout(InputTarget target, IntPtr original, IntPtr destination, Func<bool> focused)
+    {
+        Func<bool> stillOnOriginal = () => focused() && GetKeyboardLayout(target.Thread) == original;
+        IntPtr window = target.Focus == IntPtr.Zero ? target.Window : target.Focus;
+        if (TryPostKeyboardLayout(window, target.Thread, destination, stillOnOriginal)) return true;
+
+        // Some editors consume the request in the focused child control.
+        return window != target.Window && TryPostKeyboardLayout(target.Window, target.Thread, destination, stillOnOriginal);
+    }
+
+    private static bool TryPostKeyboardLayout(IntPtr window, uint thread, IntPtr destination, Func<bool> stillOnOriginal)
     {
         const uint inputLanguageChangeRequest = 0x0050;
-        IntPtr window = target.Focus == IntPtr.Zero ? target.Window : target.Focus;
-        return PostMessage(window, inputLanguageChangeRequest, UIntPtr.Zero, layout);
+        if (!stillOnOriginal() || !PostMessage(window, inputLanguageChangeRequest, UIntPtr.Zero, destination)) return false;
+
+        var timer = Stopwatch.StartNew();
+        while (stillOnOriginal() && timer.ElapsedMilliseconds < 200) Thread.Sleep(10);
+        return GetKeyboardLayout(thread) == destination;
     }
 
     internal static int Modifiers()

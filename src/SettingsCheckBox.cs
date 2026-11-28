@@ -29,7 +29,9 @@ internal sealed class SettingsCheckBox : CheckBox
         }
 
         int size = LogicalToDeviceUnits(18);
-        var box = new Rectangle(LogicalToDeviceUnits(4), (Height - size) / 2, size, size);
+        bool rtl = RightToLeft == RightToLeft.Yes;
+        int edge = LogicalToDeviceUnits(4);
+        var box = new Rectangle(rtl ? Width - edge - size : edge, (Height - size) / 2, size, size);
         bool hot = Enabled && hovered;
         Color muted = Theme.HighContrast ? SystemColors.GrayText : Theme.Muted;
         Color fill = hot ? Theme.Hover : Theme.Field;
@@ -82,8 +84,9 @@ internal sealed class SettingsCheckBox : CheckBox
         graphics.Restore(state);
 
         int inset = LogicalToDeviceUnits(LabelInset);
-        var label = new Rectangle(inset, 0, Math.Max(0, Width - inset), Height);
+        var label = new Rectangle(rtl ? 0 : inset, 0, Math.Max(0, Width - inset), Height);
         TextRenderer.DrawText(graphics, Text, Font, label, Enabled ? Theme.Text : muted,
-            TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
+            (rtl ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left));
     }
 }

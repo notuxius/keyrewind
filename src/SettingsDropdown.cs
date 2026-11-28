@@ -53,6 +53,7 @@ internal sealed class SettingsDropdown : SettingsButton
         }
 
         options.Font = Font;
+        options.RightToLeft = RightToLeft;
         options.MinimumSize = options.MaximumSize = new Size(Width, 0);
         foreach (ToolStripItem item in options.Items)
         {

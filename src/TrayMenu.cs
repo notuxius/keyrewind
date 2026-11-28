@@ -50,7 +50,7 @@ internal sealed class TrayMenu : ContextMenuStrip
         int x = bounds.IsEmpty ? cursor.X : bounds.Left + bounds.Width / 2;
         int above = (bounds.IsEmpty ? Math.Min(cursor.Y, workArea.Bottom) : bounds.Top) - size.Height;
         int below = bounds.IsEmpty ? cursor.Y : bounds.Bottom;
-        // Show at the measured position while NotifyIcon is handling menu activation.
+        // Show at the measured position while handling the tray icon's menu activation.
         positioning = true;
         try { Show(new Point(x - size.Width / 2, above >= workArea.Top ? above : below)); }
         finally { positioning = false; }
@@ -197,14 +197,16 @@ internal sealed class TrayMenu : ContextMenuStrip
             var symbol = (TrayMenuIcon)item.Tag;
             int iconSize = menu.Scale(18);
             int top = (item.Height - iconSize) / 2;
+            bool rtl = menu.RightToLeft == RightToLeft.Yes;
+            int iconLeft = rtl ? item.Width - menu.Scale(13) - iconSize : menu.Scale(13);
             Color color = symbol == TrayMenuIcon.Gamepad && item.Enabled
                 ? theme.Dark ? Color.FromArgb(196, 168, 255) : Color.FromArgb(102, 62, 177)
                 : theme.Muted;
-            TrayIcons.DrawMenuIcon(e.Graphics, symbol, color, new Rectangle(menu.Scale(13), top, iconSize, iconSize));
+            TrayIcons.DrawMenuIcon(e.Graphics, symbol, color, new Rectangle(iconLeft, top, iconSize, iconSize));
 
             if (item.Checked)
             {
-                int x = item.Width - menu.Scale(CheckInset);
+                int x = rtl ? menu.Scale(CheckInset) : item.Width - menu.Scale(CheckInset);
                 int y = item.Height / 2;
                 using (var pen = new Pen(item.Enabled ? theme.Accent : theme.Muted, menu.Scale(2))
                     { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
@@ -216,10 +218,14 @@ internal sealed class TrayMenu : ContextMenuStrip
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            int x = menu.Scale(TextInset);
-            int width = e.Item.Width - x - menu.Scale(CheckInset + 10);
+            bool rtl = menu.RightToLeft == RightToLeft.Yes;
+            int leading = menu.Scale(TextInset);
+            int trailing = menu.Scale(CheckInset + 10);
+            int width = e.Item.Width - leading - trailing;
+            int x = rtl ? trailing : leading;
             e.TextRectangle = new Rectangle(x, 0, width, e.Item.Height);
-            e.TextFormat = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+            e.TextFormat = (rtl ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left) |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.PreserveGraphicsClipping;
             e.TextColor = e.Item.Enabled ? menu.theme.Text : menu.theme.Muted;
             base.OnRenderItemText(e);

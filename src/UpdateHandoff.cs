@@ -114,7 +114,8 @@ internal static class UpdateHandoff
             catch (Exception error)
             {
                 if (!IsFailure(error)) throw;
-                MessageBox.Show(error.Message + "\r\n\r\n" + update.DirectoryPath, Program.Name,
+                UiText.UseLanguage(Settings.ReadLanguage());
+                MessageBox.Show(UiText.Get(error.Message) + "\r\n\r\n" + update.DirectoryPath, Program.Name,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
